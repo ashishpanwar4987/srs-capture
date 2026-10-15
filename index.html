@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SRS Capture</title>
+<meta name="theme-color" content="#12344d">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+/* Field tool: one column, big touch targets, readable in engine-room light and on deck in sun. */
+:root{
+  --bg:#eef2f5; --panel:#ffffff; --ink:#132330; --muted:#5b6b78; --line:#cfd8df;
+  --brand:#12344d; --brand-ink:#ffffff; --accent:#e39a1c;
+  --def:#c0392b; --obs:#b7791f; --sat:#2f7d4f; --closed:#4a6578;
+  --font:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
+  --mono:ui-monospace,"Cascadia Mono","Roboto Mono",Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1820; --panel:#15242f; --ink:#e3ebf1; --muted:#93a4b1; --line:#2a3d4b;
+  --brand:#0b2638; --brand-ink:#ffffff; --accent:#f0ad3a;
+  --def:#ef6b5c; --obs:#e0a640; --sat:#5fbf86; --closed:#8fa9bb; color-scheme:dark;}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 var(--font);-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+header{position:sticky;top:0;z-index:5;background:var(--brand);color:var(--brand-ink);
+  padding:calc(10px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 10px max(16px,env(safe-area-inset-left,0px));
+  display:flex;align-items:center;gap:12px}
+header h1{font-size:18px;margin:0;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+header .sub{font-size:12px;opacity:.75;display:block;font-weight:400}
+.hbtn{background:transparent;border:1px solid rgba(255,255,255,.35);color:inherit;border-radius:8px;padding:8px 12px;font:inherit;font-size:14px}
+main{padding:16px max(16px,env(safe-area-inset-right,0px)) 120px max(16px,env(safe-area-inset-left,0px));max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.panel h2{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+textarea{min-height:110px;resize:vertical}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2 .full{grid-column:1/-1}
+@media (max-width:420px){.grid2{grid-template-columns:1fr}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 18px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-weight:600}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.accent{background:var(--accent);color:#1d1300;border-color:var(--accent)}
+.btn.danger{color:var(--def);border-color:var(--def);background:transparent}
+.btn.block{width:100%}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>.btn{flex:1 1 140px}
+.fab{position:fixed;left:0;right:0;bottom:0;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));
+  background:linear-gradient(to top,var(--bg) 70%,transparent);z-index:4}
+.fab .btn{width:100%;max-width:720px;margin:0 auto;display:flex;font-size:17px}
+.list{display:flex;flex-direction:column;gap:10px}
+.card{display:flex;gap:12px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:left;width:100%;font:inherit;color:inherit}
+.card .thumb{width:72px;height:72px;border-radius:8px;object-fit:cover;background:var(--bg);flex:none}
+.card .body{flex:1;min-width:0}
+.card .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-bottom:4px}
+.card .cap{margin:0;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.no{font-family:var(--mono);font-weight:700;color:var(--ink)}
+.chip{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border:1px solid currentColor}
+.chip.Deficiency{color:var(--def)} .chip.Observation{color:var(--obs)} .chip.Satisfactory{color:var(--sat)} .chip.Closed{color:var(--closed)}
+.seg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.seg button{min-height:46px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-weight:600}
+.seg button[aria-pressed="true"]{border-width:2px}
+.seg button[data-v="Deficiency"][aria-pressed="true"]{border-color:var(--def);color:var(--def)}
+.seg button[data-v="Observation"][aria-pressed="true"]{border-color:var(--obs);color:var(--obs)}
+.seg button[data-v="Satisfactory"][aria-pressed="true"]{border-color:var(--sat);color:var(--sat)}
+.seg button[data-v="Closed"][aria-pressed="true"]{border-color:var(--closed);color:var(--closed)}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin-top:10px}
+.photos figure{margin:0;position:relative}
+.photos img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:8px;display:block}
+.photos .x{position:absolute;top:4px;right:4px;width:30px;height:30px;border-radius:50%;border:0;background:rgba(0,0,0,.65);color:#fff;font-size:16px}
+.empty{text-align:center;color:var(--muted);padding:28px 12px}
+.hint{font-size:13px;color:var(--muted);margin:6px 0 0}
+.stats{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.stats b{color:var(--ink);font-variant-numeric:tabular-nums}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:9;max-width:90vw}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px;font-size:14px}
+details summary{cursor:pointer;font-weight:600;list-style:none}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"▸";float:right;color:var(--muted)}
+details[open] summary::after{content:"▾"}
+@media (prefers-reduced-motion:no-preference){.card,.btn{transition:transform .08s}.card:active,.btn:active{transform:scale(.985)}}
+</style>
+</head>
+<body>
+<header>
+  <button class="hbtn" id="backBtn" hidden aria-label="Back">‹ Back</button>
+  <h1 id="title">SRS Capture<span class="sub" id="subtitle">Offline survey findings</span></h1>
+</header>
+
+<!-- VIEW: survey list -->
+<main id="vList">
+  <div class="list" id="surveyList"></div>
+  <p class="hint">Everything is stored on this phone only. Nothing is uploaded. Export a ZIP when the survey is done.</p>
+</main>
+
+<!-- VIEW: one survey -->
+<main id="vSurvey" hidden>
+  <details class="panel" id="hdrPanel">
+    <summary>Survey details</summary>
+    <div class="grid2" style="margin-top:12px">
+      <div class="full"><label for="f_vessel">Name of ship</label><input id="f_vessel" autocomplete="off"></div>
+      <div><label for="f_imo">IMO No.</label><input id="f_imo" inputmode="numeric" autocomplete="off"></div>
+      <div><label for="f_ir">IR No.</label><input id="f_ir" autocomplete="off"></div>
+      <div class="full"><label for="f_type">Survey type</label>
+        <select id="f_type">
+          <option>Annual</option><option>Intermediate</option><option>Renewal</option>
+          <option>Occasional</option><option>Damage</option><option>CoC / Memo follow-up</option>
+          <option>General examination after PSC detention</option><option>Other</option>
+        </select></div>
+      <div><label for="f_port">Place / port</label><input id="f_port" autocomplete="off"></div>
+      <div><label for="f_date">Date</label><input id="f_date" type="date"></div>
+      <div><label for="f_report">Report No.</label><input id="f_report" autocomplete="off"></div>
+      <div><label for="f_station">Survey station</label><input id="f_station" autocomplete="off"></div>
+      <div class="full"><label for="f_surveyor">Surveyor(s)</label><input id="f_surveyor" autocomplete="off"></div>
+      <div class="full"><label for="f_notes">General notes (scope, attendance remarks)</label><textarea id="f_notes" style="min-height:70px"></textarea></div>
+    </div>
+  </details>
+
+  <div class="stats" id="stats"></div>
+  <div class="list" id="itemList"></div>
+
+  <section class="panel">
+    <h2>Finish</h2>
+    <div class="row">
+      <button class="btn primary" id="exportBtn">Save ZIP</button>
+      <button class="btn" id="shareBtn">Share ZIP</button>
+    </div>
+    <p class="hint">The ZIP holds the photos plus <span class="no">srs_data.json</span> and <span class="no">captions.csv</span>. Run it through the SRS generator on your laptop to get the Word sheet.</p>
+    <div style="margin-top:14px">
+      <button class="btn danger" id="delSurveyBtn">Delete this survey</button>
+      <div class="confirm" id="delSurveyConfirm" hidden>Delete the survey and all its photos from this phone?
+        <button class="btn danger" id="delSurveyYes">Delete</button><button class="btn" id="delSurveyNo">Keep</button></div>
+    </div>
+  </section>
+</main>
+
+<!-- VIEW: one finding -->
+<main id="vItem" hidden>
+  <section class="panel">
+    <h2>Photos</h2>
+    <div class="row">
+      <button class="btn accent" id="camBtn">Take photo</button>
+      <button class="btn" id="galBtn">From gallery</button>
+    </div>
+    <input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+    <input type="file" id="galInput" accept="image/*" multiple hidden>
+    <div class="photos" id="itemPhotos"></div>
+  </section>
+
+  <section class="panel">
+    <h2>Finding</h2>
+    <label for="i_area">Area</label>
+    <select id="i_area">
+      <option>Hull & deck</option><option>Cargo area / tanks</option><option>Engine room</option>
+      <option>Steering gear</option><option>Fire safety (FFA)</option><option>Life-saving (LSA)</option>
+      <option>Navigation & radio</option><option>Pollution prevention (MARPOL)</option>
+      <option>Load line</option><option>Accommodation / MLC</option><option>Electrical</option>
+      <option>Certificates & documents</option><option>Other</option>
+    </select>
+    <label for="i_loc" style="margin-top:12px">Location (optional)</label>
+    <input id="i_loc" autocomplete="off" placeholder="e.g. Shell plating stbd, No.2 DG">
+    <label style="margin-top:12px">Status</label>
+    <div class="seg" id="i_status">
+      <button type="button" data-v="Deficiency" aria-pressed="false">Deficiency</button>
+      <button type="button" data-v="Observation" aria-pressed="false">Observation</button>
+      <button type="button" data-v="Satisfactory" aria-pressed="false">Satisfactory</button>
+      <button type="button" data-v="Closed" aria-pressed="false">CoC closed</button>
+    </div>
+    <label for="i_caption" style="margin-top:12px">Caption / finding</label>
+    <textarea id="i_caption" placeholder="e.g. ME scavenge space drain pipe wasted and holed, stbd side"></textarea>
+    <p class="hint">Tip: tap the mic on your keyboard to dictate. Gboard dictation works offline once the English offline pack is installed.</p>
+    <label for="i_rec" style="margin-top:12px">Recommendation (optional)</label>
+    <textarea id="i_rec" style="min-height:70px" placeholder="Leave blank for the standard wording: “To be rectified to the satisfaction of the attending Surveyor.”"></textarea>
+  </section>
+
+  <div class="row">
+    <button class="btn primary" id="saveItemBtn">Save finding</button>
+    <button class="btn danger" id="delItemBtn">Delete</button>
+  </div>
+  <div class="confirm" id="delItemConfirm" hidden>Delete this finding and its photos?
+    <button class="btn danger" id="delItemYes">Delete</button><button class="btn" id="delItemNo">Keep</button></div>
+</main>
+
+<div class="fab" id="fab"><button class="btn primary" id="fabBtn">+ New survey</button></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+'use strict';
+/* ---------- storage (IndexedDB) ---------- */
+const DB_NAME='srs-capture', DB_VER=1;
+let dbp=null;
+function db(){
+  if(!dbp) dbp=new Promise((res,rej)=>{
+    const r=indexedDB.open(DB_NAME,DB_VER);
+    r.onupgradeneeded=()=>{const d=r.result;
+      d.createObjectStore('surveys',{keyPath:'id'});
+      const it=d.createObjectStore('items',{keyPath:'id'}); it.createIndex('survey','surveyId');
+      d.createObjectStore('photos',{keyPath:'id'});};
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+  return dbp;
+}
+async function tx(store,mode,fn){
+  const d=await db();
+  return new Promise((res,rej)=>{
+    const t=d.transaction(store,mode); const s=t.objectStore(store); let out;
+    Promise.resolve(fn(s)).then(v=>{out=v});
+    t.oncomplete=()=>res(out); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error);
+  });
+}
+const req=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
+const put=(store,obj)=>tx(store,'readwrite',s=>req(s.put(obj)));
+const get=(store,id)=>tx(store,'readonly',s=>req(s.get(id)));
+const del=(store,id)=>tx(store,'readwrite',s=>req(s.delete(id)));
+const all=store=>tx(store,'readonly',s=>req(s.getAll()));
+const itemsOf=sid=>tx('items','readonly',s=>req(s.index('survey').getAll(sid)));
+const uid=()=>(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));
+
+/* ---------- helpers ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastT; function toast(m){const t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600);}
+const urls=new Set(); function blobUrl(b){const u=URL.createObjectURL(b);urls.add(u);return u;}
+function freeUrls(){urls.forEach(u=>URL.revokeObjectURL(u));urls.clear();}
+const today=()=>new Date().toISOString().slice(0,10);
+
+async function compress(file){
+  // Downscale to max 1600 px long side, JPEG q0.8: keeps the annex sharp and the phone storage small.
+  const MAX=1600;
+  let bmp;
+  try{bmp=await createImageBitmap(file,{imageOrientation:'from-image'});}
+  catch(e){bmp=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(file);});}
+  const w=bmp.width,h=bmp.height,k=Math.min(1,MAX/Math.max(w,h));
+  const c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);
+  c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+  const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.8));
+  return {blob,w:c.width,h:c.height};
+}
+
+/* ---------- state + views ---------- */
+let cur={survey:null,item:null};
+const views=['vList','vSurvey','vItem'];
+function show(v){views.forEach(x=>$(x).hidden=x!==v);$('backBtn').hidden=v==='vList';window.scrollTo(0,0);}
+function setTitle(t,s){$('title').innerHTML=esc(t)+'<span class="sub">'+esc(s||'')+'</span>';}
+
+async function openList(){
+  freeUrls(); cur={survey:null,item:null}; show('vList'); setTitle('SRS Capture','Offline survey findings');
+  $('fabBtn').textContent='+ New survey'; $('fab').hidden=false;
+  const ss=(await all('surveys')).sort((a,b)=>(b.updated||0)-(a.updated||0));
+  const L=$('surveyList');
+  if(!ss.length){L.innerHTML='<div class="empty panel">No surveys yet.<br>Tap <b>+ New survey</b> when you board.</div>';return;}
+  const counts=await Promise.all(ss.map(s=>itemsOf(s.id).then(a=>a.length)));
+  L.innerHTML=ss.map((s,i)=>`<button class="card" data-id="${s.id}"><div class="body">
+    <div class="meta"><span>${esc(s.date||'')}</span><span>·</span><span>${esc(s.type||'')}</span></div>
+    <p class="cap"><b>${esc(s.vessel||'Unnamed ship')}</b>${s.port?' — '+esc(s.port):''}</p>
+    <div class="meta" style="margin:4px 0 0">${counts[i]} finding${counts[i]===1?'':'s'}${s.report?' · '+esc(s.report):''}</div></div></button>`).join('');
+  L.querySelectorAll('.card').forEach(b=>b.onclick=()=>openSurvey(b.dataset.id));
+}
+
+const HF={vessel:'f_vessel',imo:'f_imo',ir:'f_ir',type:'f_type',port:'f_port',date:'f_date',report:'f_report',station:'f_station',surveyor:'f_surveyor',notes:'f_notes'};
+async function newSurvey(){
+  let last={}; try{last=JSON.parse(localStorage.getItem('srs-last')||'{}')}catch(e){}
+  const s={id:uid(),created:Date.now(),updated:Date.now(),type:'Annual',date:today(),station:last.station||'',surveyor:last.surveyor||''};
+  await put('surveys',s); await openSurvey(s.id,true);
+}
+async function openSurvey(id,fresh){
+  freeUrls(); const s=await get('surveys',id); if(!s) return openList();
+  cur.survey=s; cur.item=null; show('vSurvey');
+  setTitle(s.vessel||'New survey',[s.type,s.date].filter(Boolean).join(' · '));
+  for(const [k,f] of Object.entries(HF)) $(f).value=s[k]??'';
+  $('hdrPanel').open=!!fresh||!s.vessel;
+  $('delSurveyConfirm').hidden=true;
+  $('fabBtn').textContent='+ Add finding'; $('fab').hidden=false;
+  await renderItems();
+}
+let saveT;
+function hdrChanged(){
+  const s=cur.survey; if(!s) return;
+  for(const [k,f] of Object.entries(HF)) s[k]=$(f).value.trim?$(f).value:$(f).value;
+  s.updated=Date.now();
+  setTitle(s.vessel||'New survey',[s.type,s.date].filter(Boolean).join(' · '));
+  clearTimeout(saveT); saveT=setTimeout(()=>{put('surveys',s);
+    try{localStorage.setItem('srs-last',JSON.stringify({station:s.station,surveyor:s.surveyor}))}catch(e){}},300);
+}
+Object.values(HF).forEach(f=>$(f).addEventListener('input',hdrChanged));
+
+async function sortedItems(sid){return (await itemsOf(sid)).sort((a,b)=>a.created-b.created);}
+async function renderItems(){
+  const items=await sortedItems(cur.survey.id);
+  const n=t=>items.filter(i=>i.status===t).length; const pl=(k,w)=>`<span><b>${k}</b> ${w}${k===1?'':'s'}</span>`;
+  const ph=items.reduce((a,i)=>a+(i.photos||[]).length,0);
+  $('stats').innerHTML=pl(items.length,'finding')+`<span><b>${n('Deficiency')}</b> ${n('Deficiency')===1?'deficiency':'deficiencies'}</span>`+pl(n('Observation'),'observation')+pl(ph,'photo');
+  const L=$('itemList');
+  if(!items.length){L.innerHTML='<div class="empty panel">No findings yet. Tap <b>+ Add finding</b>, take the photo, write one line.</div>';return;}
+  const thumbs=await Promise.all(items.map(i=>i.photos&&i.photos[0]?get('photos',i.photos[0]):null));
+  L.innerHTML=items.map((it,k)=>`<button class="card" data-id="${it.id}">
+    ${thumbs[k]?`<img class="thumb" alt="" src="${blobUrl(thumbs[k].blob)}">`:'<div class="thumb"></div>'}
+    <div class="body"><div class="meta"><span class="no">${k+1}</span><span class="chip ${esc(it.status)}">${esc(it.status==='Closed'?'CoC closed':it.status)}</span><span>${esc(it.location||it.area)}</span>${(it.photos||[]).length>1?'<span>· '+it.photos.length+' photos</span>':''}</div>
+    <p class="cap">${esc(it.caption)||'<i>No caption</i>'}</p></div></button>`).join('');
+  L.querySelectorAll('.card').forEach(b=>b.onclick=()=>openItem(b.dataset.id));
+}
+
+/* ---------- finding editor ---------- */
+let draftPhotos=[], removedPhotos=[], status='Deficiency';
+function setStatus(v){status=v;$('i_status').querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.v===v));}
+$('i_status').querySelectorAll('button').forEach(b=>b.onclick=()=>setStatus(b.dataset.v));
+
+async function openItem(id){
+  freeUrls(); let it;
+  if(id){it=await get('items',id);}
+  else{let lastArea='Hull & deck';try{lastArea=localStorage.getItem('srs-area')||lastArea}catch(e){}
+    it={id:uid(),surveyId:cur.survey.id,created:Date.now(),area:lastArea,status:'Deficiency',caption:'',photos:[],isNew:true};}
+  cur.item=it; draftPhotos=[...(it.photos||[])]; removedPhotos=[];
+  $('i_area').value=it.area; $('i_caption').value=it.caption; setStatus(it.status);
+  $('i_loc').value=it.location||''; $('i_rec').value=it.recommendation||'';
+  $('delItemBtn').hidden=!!it.isNew; $('delItemConfirm').hidden=true;
+  show('vItem'); $('fab').hidden=true;
+  setTitle(it.isNew?'New finding':'Edit finding',cur.survey.vessel||'');
+  await renderPhotos();
+}
+async function renderPhotos(){
+  const P=$('itemPhotos');
+  const recs=await Promise.all(draftPhotos.map(p=>get('photos',p)));
+  P.innerHTML=recs.map((r,i)=>r?`<figure><img alt="Photo ${i+1}" src="${blobUrl(r.blob)}"><button class="x" data-i="${i}" aria-label="Remove photo">×</button></figure>`:'').join('');
+  P.querySelectorAll('.x').forEach(b=>b.onclick=()=>{removedPhotos.push(draftPhotos[+b.dataset.i]);draftPhotos.splice(+b.dataset.i,1);renderPhotos();});
+}
+async function addFiles(files){
+  for(const f of files){
+    try{const {blob,w,h}=await compress(f);const id=uid();await put('photos',{id,blob,w,h,taken:f.lastModified||Date.now()});draftPhotos.push(id);}
+    catch(e){toast('Could not read one photo');}
+  }
+  await renderPhotos();
+}
+$('camBtn').onclick=()=>$('camInput').click();
+$('galBtn').onclick=()=>$('galInput').click();
+$('camInput').onchange=e=>{addFiles([...e.target.files]);e.target.value='';};
+$('galInput').onchange=e=>{addFiles([...e.target.files]);e.target.value='';};
+
+$('saveItemBtn').onclick=async()=>{
+  const it=cur.item; delete it.isNew;
+  it.area=$('i_area').value; it.status=status; it.caption=$('i_caption').value.trim(); it.photos=draftPhotos;
+  it.location=$('i_loc').value.trim(); it.recommendation=$('i_rec').value.trim(); it.updated=Date.now();
+  if(!it.caption&&!it.photos.length){toast('Add a photo or a caption first');return;}
+  await put('items',it); for(const p of removedPhotos) await del('photos',p);
+  try{localStorage.setItem('srs-area',it.area)}catch(e){}
+  cur.survey.updated=Date.now(); await put('surveys',cur.survey);
+  toast('Finding saved'); openSurvey(cur.survey.id);
+};
+$('delItemBtn').onclick=()=>$('delItemConfirm').hidden=false;
+$('delItemNo').onclick=()=>$('delItemConfirm').hidden=true;
+$('delItemYes').onclick=async()=>{for(const p of [...draftPhotos,...removedPhotos]) await del('photos',p); await del('items',cur.item.id); toast('Finding deleted'); openSurvey(cur.survey.id);};
+
+$('delSurveyBtn').onclick=()=>$('delSurveyConfirm').hidden=false;
+$('delSurveyNo').onclick=()=>$('delSurveyConfirm').hidden=true;
+$('delSurveyYes').onclick=async()=>{
+  const items=await itemsOf(cur.survey.id);
+  for(const it of items){for(const p of it.photos||[]) await del('photos',p); await del('items',it.id);}
+  await del('surveys',cur.survey.id); toast('Survey deleted'); openList();
+};
+
+/* ---------- back / fab ---------- */
+$('backBtn').onclick=async()=>{
+  if(!$('vItem').hidden){ // discard unsaved new photos
+    const kept=new Set(cur.item.photos||[]);
+    for(const p of draftPhotos) if(!kept.has(p)) await del('photos',p);
+    return openSurvey(cur.survey.id);
+  }
+  openList();
+};
+$('fabBtn').onclick=()=>cur.survey?openItem(null):newSurvey();
+
+/* ---------- export: ZIP (stored, no compression; JPEGs are already compressed) ---------- */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+function crc32(u8){let c=0xFFFFFFFF;for(let i=0;i<u8.length;i++)c=CRC[(c^u8[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function makeZip(files){ // files: [{name, data:Uint8Array}]
+  const enc=new TextEncoder(),parts=[],central=[];let off=0;
+  const d=new Date(),dt=((d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1)),dd=(((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate());
+  for(const f of files){
+    const nm=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+    const h=new DataView(new ArrayBuffer(30));
+    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);
+    h.setUint16(10,dt,true);h.setUint16(12,dd,true);h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);
+    h.setUint16(26,nm.length,true);h.setUint16(28,0,true);
+    parts.push(new Uint8Array(h.buffer),nm,f.data);
+    const c=new DataView(new ArrayBuffer(46));
+    c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);
+    c.setUint16(12,dt,true);c.setUint16(14,dd,true);c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);
+    c.setUint16(28,nm.length,true);c.setUint32(42,off,true);
+    central.push(new Uint8Array(c.buffer),nm);
+    off+=30+nm.length+sz;
+  }
+  const cdSize=central.reduce((a,b)=>a+b.length,0);
+  const e=new DataView(new ArrayBuffer(22));
+  e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);
+  e.setUint32(12,cdSize,true);e.setUint32(16,off,true);
+  return new Blob([...parts,...central,new Uint8Array(e.buffer)],{type:'application/zip'});
+}
+const csvCell=v=>{v=String(v??'');return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+const safe=s=>String(s||'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').slice(0,40);
+
+async function buildZip(){
+  const s=cur.survey, items=await sortedItems(s.id);
+  if(!items.length) throw new Error('No findings to export yet');
+  const files=[],rows=[['item_no','area','location','status','caption','recommendation','photo_nos','photo_files']];
+  const data={app:'SRS Capture',version:1,exported:new Date().toISOString(),
+    survey:Object.fromEntries(Object.keys(HF).map(k=>[k,s[k]||''])),items:[]};
+  let pn=0;
+  for(let i=0;i<items.length;i++){
+    const it=items[i],nos=[],names=[];
+    for(const pid of it.photos||[]){
+      const r=await get('photos',pid); if(!r) continue;
+      pn++; const name=`photos/P${String(pn).padStart(3,'0')}_item${String(i+1).padStart(2,'0')}_${safe(it.area)}.jpg`;
+      files.push({name,data:new Uint8Array(await r.blob.arrayBuffer())}); nos.push(pn); names.push(name);
+    }
+    data.items.push({no:i+1,area:it.area,location:it.location||'',status:it.status,caption:it.caption,recommendation:it.recommendation||'',photo_nos:nos,photos:names});
+    rows.push([i+1,it.area,it.location||'',it.status,it.caption,it.recommendation||'',nos.join(' '),names.join(' ')]);
+  }
+  const enc=new TextEncoder();
+  files.unshift({name:'srs_data.json',data:enc.encode(JSON.stringify(data,null,2))},
+                {name:'captions.csv',data:enc.encode('﻿'+rows.map(r=>r.map(csvCell).join(',')).join('\r\n'))});
+  const fname=`${safe(s.report)||'SRS'}_${safe(s.vessel)||'ship'}_${s.date||today()}.zip`;
+  return {blob:makeZip(files),fname};
+}
+$('exportBtn').onclick=async()=>{
+  try{const {blob,fname}=await buildZip();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('Saved '+fname+' to Downloads');}
+  catch(e){toast(e.message||'Export failed');}
+};
+$('shareBtn').onclick=async()=>{
+  try{const {blob,fname}=await buildZip();const f=new File([blob],fname,{type:'application/zip'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:fname});}
+    else toast('Sharing files is not supported here. Use Save ZIP.');}
+  catch(e){if(e.name!=='AbortError')toast(e.message||'Share failed');}
+};
+
+/* ---------- boot ---------- */
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if(navigator.storage&&navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+openList().catch(e=>{$('surveyList').innerHTML='<div class="empty panel">This browser blocked on-phone storage ('+esc(e.message||e)+'). Open the app from Chrome, not a private tab.</div>';});
+</script>
+</body>
+</html>
