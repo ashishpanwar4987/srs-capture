@@ -130,7 +130,23 @@ details[open] summary::after{content:"▾"}
       <button class="btn" id="shareBtn">Share ZIP</button>
     </div>
     <p class="hint">The ZIP holds the photos plus <span class="no">srs_data.json</span> and <span class="no">captions.csv</span>. Run it through the SRS generator on your laptop to get the Word sheet.</p>
-    <div style="margin-top:14px">
+  </section>
+
+  <section class="panel">
+    <h2>Review with Claude (needs internet)</h2>
+    <div class="row">
+      <button class="btn accent" id="aiSendBtn">1 · Send to Claude</button>
+      <button class="btn" id="aiSaveBtn">Save sheets</button>
+    </div>
+    <p class="hint">Packs your photos onto labelled sheets, 6 per image, and copies a ready prompt. Share to the Claude app, then <b>paste</b> the prompt (long-press → Paste) and send.</p>
+    <label for="aiReply" style="margin-top:12px">2 · Paste Claude's reply</label>
+    <textarea id="aiReply" style="min-height:90px" placeholder="Paste Claude's whole answer here"></textarea>
+    <div class="row" style="margin-top:8px"><button class="btn primary" id="aiApplyBtn">Apply to findings</button></div>
+    <p class="hint" id="aiStatus"></p>
+  </section>
+
+  <section class="panel">
+    <div>
       <button class="btn danger" id="delSurveyBtn">Delete this survey</button>
       <div class="confirm" id="delSurveyConfirm" hidden>Delete the survey and all its photos from this phone?
         <button class="btn danger" id="delSurveyYes">Delete</button><button class="btn" id="delSurveyNo">Keep</button></div>
@@ -435,6 +451,91 @@ $('shareBtn').onclick=async()=>{
     if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:fname});}
     else toast('Sharing files is not supported here. Use Save ZIP.');}
   catch(e){if(e.name!=='AbortError')toast(e.message||'Share failed');}
+};
+
+/* ---------- review with Claude: contact sheets + prompt, then apply the reply ---------- */
+async function buildClaudePack(){
+  const s=cur.survey, items=await sortedItems(s.id);
+  if(!items.length) throw new Error('No findings to review yet');
+  const tiles=[]; let pn=0; const lines=[];
+  for(let i=0;i<items.length;i++){
+    const it=items[i], nos=[];
+    for(const pid of it.photos||[]){const r=await get('photos',pid); if(!r) continue; pn++; nos.push('P'+pn); tiles.push({label:`#${i+1}  P${pn}  ${it.location||it.area}`,blob:r.blob});}
+    lines.push(`${i+1}. [${it.status}] Area: ${it.area}${it.location?' | Location: '+it.location:''} | Finding: ${it.caption||'-'}${it.recommendation?' | Rec: '+it.recommendation:''} | Photos: ${nos.join(', ')||'none'}`);
+  }
+  // 2 x 3 grid per sheet, 768x576 tiles + label bar -> about one image's worth of tokens for six photos
+  const TW=768,TH=576,BAR=44,C=2,R=3,sheets=[];
+  for(let k=0;k<tiles.length;k+=C*R){
+    const part=tiles.slice(k,k+C*R), rows=Math.ceil(part.length/C);
+    const cv=document.createElement('canvas'); cv.width=TW*C; cv.height=(TH+BAR)*rows;
+    const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height);
+    for(let j=0;j<part.length;j++){
+      const x=(j%C)*TW, y=Math.floor(j/C)*(TH+BAR);
+      const bmp=await createImageBitmap(part[j].blob); const sc=Math.min(TW/bmp.width,TH/bmp.height);
+      const w=bmp.width*sc,h=bmp.height*sc; g.drawImage(bmp,x+(TW-w)/2,y+BAR+(TH-h)/2,w,h);
+      g.fillStyle='#12344d'; g.fillRect(x,y,TW,BAR); g.fillStyle='#fff'; g.font='bold 26px system-ui,sans-serif';
+      g.fillText(part[j].label.slice(0,48),x+12,y+31);
+      g.strokeStyle='#999'; g.strokeRect(x+.5,y+.5,TW-1,TH+BAR-1);
+    }
+    const b=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.78));
+    sheets.push(new File([b],`${safe(s.vessel)||'ship'}_sheet${sheets.length+1}.jpg`,{type:'image/jpeg'}));
+  }
+  const prompt=
+`You are assisting an IRS (Indian Register of Shipping) classification surveyor. Write findings for a Survey Recommendation Sheet (Form SRS Rev.1).
+Ship: ${s.vessel||'-'} | Survey: ${s.type||'-'} | Place: ${s.port||'-'} | Date: ${s.date||'-'}
+The attached image${sheets.length>1?'s are contact sheets':' is a contact sheet'}; each photo is labelled "#item  Pphoto  location".
+
+Findings recorded onboard:
+${lines.join('\n')}
+
+For every finding:
+- check the photo(s) against the recorded finding; note anything the photo shows that the text misses, or any mismatch;
+- give a short Location (e.g. "Shell plating stbd", "No.2 DG");
+- rewrite the finding as concise, factual surveyor wording (no exaggeration, nothing not visible or recorded);
+- give a Recommendation in IRS style, normally ending "to the satisfaction of the attending Surveyor."; keep the surveyor's own recommendation if one is given unless it is clearly wrong.
+Do not invent rule references or time limits.
+
+Reply with ONLY a JSON array, one object per finding, in this exact form:
+[{"no":1,"location":"...","caption":"...","recommendation":"...","note":"photo/text mismatch or empty"}]`;
+  return {sheets,prompt,items};
+}
+async function copyText(t){try{await navigator.clipboard.writeText(t);return true;}catch(e){return false;}}
+$('aiSendBtn').onclick=async()=>{
+  try{
+    const {sheets,prompt}=await buildClaudePack();
+    const copied=await copyText(prompt);
+    const files=sheets.length?sheets:[];
+    if(files.length&&navigator.canShare&&navigator.canShare({files})){
+      toast(copied?'Prompt copied. Pick Claude, then paste it':'Pick Claude, then paste the prompt');
+      await navigator.share({files,text:prompt});
+    }else if(!files.length&&navigator.share){await navigator.share({text:prompt});}
+    else{toast(copied?'Prompt copied. Use Save sheets, then attach them in Claude':'Sharing not supported here');}
+    $('aiStatus').textContent=`${sheets.length} sheet${sheets.length===1?'':'s'} sent. When Claude answers, copy its whole reply into box 2.`;
+  }catch(e){if(e.name!=='AbortError')toast(e.message||'Could not build the review pack');}
+};
+$('aiSaveBtn').onclick=async()=>{
+  try{
+    const {sheets,prompt}=await buildClaudePack(); const copied=await copyText(prompt);
+    for(const f of sheets){const a=document.createElement('a');a.href=URL.createObjectURL(f);a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);}
+    toast(`Saved ${sheets.length} sheet(s)`+(copied?'. Prompt copied':''));
+  }catch(e){toast(e.message||'Could not save sheets');}
+};
+$('aiApplyBtn').onclick=async()=>{
+  const raw=$('aiReply').value; const m=raw.match(/\[[\s\S]*\]/);
+  if(!m){toast('No JSON list found in the pasted reply');return;}
+  let arr; try{arr=JSON.parse(m[0]);}catch(e){toast('The reply is not valid JSON. Ask Claude for "only the JSON array"');return;}
+  const items=await sortedItems(cur.survey.id); let n=0; const notes=[];
+  for(const r of arr){
+    const it=items[(+r.no)-1]; if(!it) continue;
+    if(r.location) it.location=String(r.location).trim();
+    if(r.caption) it.caption=String(r.caption).trim();
+    if(r.recommendation) it.recommendation=String(r.recommendation).trim();
+    if(r.note&&String(r.note).trim()) notes.push(`#${r.no}: ${String(r.note).trim()}`);
+    it.updated=Date.now(); await put('items',it); n++;
+  }
+  $('aiReply').value=''; await renderItems();
+  $('aiStatus').textContent=`Updated ${n} finding${n===1?'':'s'}.`+(notes.length?' Check: '+notes.join(' · '):'')+' Open any finding to edit, then Save ZIP.';
+  toast(`Applied to ${n} findings`);
 };
 
 /* ---------- boot ---------- */

@@ -1,5 +1,5 @@
 // SRS Capture service worker: cache the app shell so it runs with no signal.
-const CACHE = 'srs-capture-v2';
+const CACHE = 'srs-capture-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
